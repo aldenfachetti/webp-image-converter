@@ -792,7 +792,7 @@ FodyWeavers.xsd
 .env.test.local
 .env.production.local
 
-# Editor directories and files
+# IDE/Editor directories and files
 .vscode/
 .idea/
 *.suo
@@ -800,8 +800,9 @@ FodyWeavers.xsd
 *.njsproj
 *.sln
 
-# Tailwind JIT cache
-.tailwind/
-
 # Build artifacts
 package-lock.json
+
+# Compiled output
+dist/
+build/

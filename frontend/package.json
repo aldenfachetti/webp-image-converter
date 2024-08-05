@@ -1,5 +1,5 @@
 {
-  "name": "webp-image-converter",
+  "name": "webp-image-converter-frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
