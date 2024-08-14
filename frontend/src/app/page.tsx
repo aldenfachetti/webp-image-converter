@@ -1,80 +1,136 @@
 "use client";
 
-import { useState, ChangeEvent } from "react";
-
-interface ConvertResponse {
-  url: string;
-}
+import { useState } from "react";
+import axios from "axios";
 
 export default function Home() {
-  const [file, setFile] = useState<File | null>(null);
-  const [format, setFormat] = useState("jpeg");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [conversionFormat, setConversionFormat] = useState("jpeg");
   const [loading, setLoading] = useState(false);
-  const [convertedImage, setConvertedImage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0); // Progress state
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // Error state
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFile(e.target.files[0]);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files ? event.target.files[0] : null;
+
+    if (file) {
+      if (!file.type.includes("webp")) {
+        setErrorMessage("Only .webp files are supported.");
+        setSelectedFile(null);
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        // 5MB limit
+        setErrorMessage("File size exceeds the 5MB limit.");
+        setSelectedFile(null);
+        return;
+      }
     }
+
+    setSelectedFile(file);
+    setProgress(0);
+    setErrorMessage(null);
   };
 
-  const handleFormatChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    setFormat(e.target.value);
-  };
-
-  const handleUpload = async () => {
-    if (!file) return;
+  const handleConversion = async () => {
+    if (!selectedFile) return;
 
     setLoading(true);
-    setError(null);
-
     const formData = new FormData();
-    formData.append("image", file);
-    formData.append("format", format);
+    formData.append("image", selectedFile);
+    formData.append("format", conversionFormat);
 
     try {
-      const response = await fetch("/api/convert", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await axios.post(
+        "http://localhost:5000/convert",
+        formData,
+        {
+          responseType: "blob", // Important for downloading files
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              setProgress(percentCompleted); // Update upload progress
+            }
+          },
+          onDownloadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              setProgress(percentCompleted); // Update download progress
+            }
+          },
+        }
+      );
 
-      if (response.ok) {
-        const data: ConvertResponse = await response.json();
-        setConvertedImage(data.url);
-      } else {
-        const errorText = await response.text();
-        setError(errorText);
-      }
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      setDownloadUrl(url);
+      setProgress(100); // Ensure progress is set to 100% after completion
     } catch (error) {
-      setError("Error occurred.");
+      console.error("Error converting image:", error);
+      setErrorMessage("Failed to convert image. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4">
-      <input type="file" onChange={handleFileChange} />
-      <select value={format} onChange={handleFormatChange}>
-        <option value="jpeg">JPEG</option>
-        <option value="png">PNG</option>
-      </select>
-      <button onClick={handleUpload} disabled={loading}>
-        {loading ? "Converting..." : "Convert Image"}
+    <div className="flex flex-col items-center justify-center min-h-screen py-2">
+      <h1 className="text-2xl font-bold mb-6">WEBP to JPEG/PNG Converter</h1>
+      <div className="mb-4">
+        <label htmlFor="fileInput">Select a .webp file:</label>
+        <input
+          type="file"
+          id="fileInput"
+          accept="image/webp"
+          onChange={handleFileChange}
+        />
+      </div>
+      <div className="mb-4">
+        <select
+          value={conversionFormat}
+          onChange={(e) => setConversionFormat(e.target.value)}
+          className="border rounded px-2 py-1"
+          title="Conversion Format"
+        >
+          <option value="jpeg">JPEG</option>
+          <option value="png">PNG</option>
+        </select>
+      </div>
+      <button
+        onClick={handleConversion}
+        disabled={!selectedFile || loading}
+        className="bg-blue-500 text-white px-4 py-2 rounded disabled:bg-gray-500"
+      >
+        Convert Image
       </button>
-      {error && <p className="text-red-500">{error}</p>}
-      {convertedImage && (
-        <div>
-          <p>Conversion Complete:</p>
-          <img src={convertedImage} alt="Converted" />
-          <a href={convertedImage} download>
-            <button className="mt-2 px-4 py-2 bg-blue-500 text-white rounded">
-              Download Image
-            </button>
-          </a>
+
+      {loading && (
+        <div className="w-full max-w-lg mt-4">
+          <div className="h-2 bg-gray-200 rounded">
+            <div
+              className="h-full bg-blue-500 rounded"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <div className="text-center mt-2">{progress}%</div>
         </div>
       )}
+
+      {downloadUrl && (
+        <a
+          href={downloadUrl}
+          download={`converted.${conversionFormat}`}
+          className="mt-4 text-blue-600 underline"
+        >
+          Download Converted Image
+        </a>
+      )}
+
+      {errorMessage && <div className="mt-4 text-red-500">{errorMessage}</div>}
     </div>
   );
 }
