@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import cors from "cors";
 import multer from "multer";
 import sharp from "sharp";
 import path from "path";
@@ -10,6 +11,9 @@ const port = 5000;
 const upload = multer({ dest: "uploads/" });
 
 app.use(express.json());
+
+// Configurando CORS para permitir requisições do frontend
+app.use(cors({ origin: "http://localhost:3000" }));
 
 app.post(
   "/api/convert",
